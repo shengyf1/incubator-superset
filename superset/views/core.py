@@ -637,7 +637,7 @@ class Superset(BaseSupersetView):
         return self.json_response({"data": viz_obj.get_samples()})
 
     def generate_json(self, viz_obj, response_type: Optional[str] = None) -> Response:
-        if response_type == utils.ChartDataResponseFormat.CSV:
+        if response_type == utils.ChartDataResultFormat.CSV:
             return CsvResponse(
                 viz_obj.get_csv(),
                 status=200,
@@ -645,13 +645,13 @@ class Superset(BaseSupersetView):
                 mimetype="application/csv",
             )
 
-        if response_type == utils.ChartDataResponseType.QUERY:
+        if response_type == utils.ChartDataResultType.QUERY:
             return self.get_query_string_response(viz_obj)
 
-        if response_type == utils.ChartDataResponseType.RESULTS:
+        if response_type == utils.ChartDataResultType.RESULTS:
             return self.get_raw_results(viz_obj)
 
-        if response_type == utils.ChartDataResponseType.SAMPLES:
+        if response_type == utils.ChartDataResultType.SAMPLES:
             return self.get_samples(viz_obj)
 
         payload = viz_obj.get_payload()
@@ -685,6 +685,21 @@ class Superset(BaseSupersetView):
         form_data = get_form_data()[0]
         form_data["layer_id"] = layer_id
         form_data["filters"] = [{"col": "layer_id", "op": "==", "val": layer_id}]
+        # Set all_columns to ensure the TableViz returns the necessary columns to the
+        # frontend.
+        form_data["all_columns"] = [
+            "created_on",
+            "changed_on",
+            "id",
+            "start_dttm",
+            "end_dttm",
+            "layer_id",
+            "short_descr",
+            "long_descr",
+            "json_metadata",
+            "created_by_fk",
+            "changed_by_fk",
+        ]
         datasource = AnnotationDatasource()
         viz_obj = viz.viz_types["table"](datasource, form_data=form_data, force=False)
         payload = viz_obj.get_payload()
@@ -713,9 +728,9 @@ class Superset(BaseSupersetView):
         payloads based on the request args in the first block
 
         TODO: break into one endpoint for each return shape"""
-        response_type = utils.ChartDataResponseFormat.JSON.value
-        responses = [resp_format for resp_format in utils.ChartDataResponseFormat]
-        responses.extend([resp_type for resp_type in utils.ChartDataResponseType])
+        response_type = utils.ChartDataResultFormat.JSON.value
+        responses = [resp_format for resp_format in utils.ChartDataResultFormat]
+        responses.extend([resp_type for resp_type in utils.ChartDataResultType])
         for response_option in responses:
             if request.args.get(response_option) == "true":
                 response_type = response_option
@@ -1730,13 +1745,9 @@ class Superset(BaseSupersetView):
                     force=True,
                 )
 
-                # Temporarily define the form-data in the request context which may be
-                # leveraged by the Jinja macros.
-                with app.test_request_context(
-                    data={"form_data": json.dumps(form_data)}
-                ):
-                    payload = obj.get_payload()
-
+                g.form_data = form_data
+                payload = obj.get_payload()
+                delattr(g, "form_data")
                 error = payload["errors"] or None
                 status = payload["status"]
             except Exception as ex:
@@ -2149,7 +2160,7 @@ class Superset(BaseSupersetView):
             return json_error_response(str(ex))
 
         spec = mydb.db_engine_spec
-        query_cost_formatters = get_feature_flags().get(
+        query_cost_formatters: Dict[str, Any] = get_feature_flags().get(
             "QUERY_COST_FORMATTERS_BY_ENGINE", {}
         )
         query_cost_formatter = query_cost_formatters.get(

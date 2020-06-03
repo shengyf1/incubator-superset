@@ -109,6 +109,8 @@ VERSION_SHA = _try_json_readsha(VERSION_INFO_FILE, VERSION_SHA_LENGTH)
 
 ROW_LIMIT = 50000
 VIZ_ROW_LIMIT = 10000
+# max rows retreieved when requesting samples from datasource in explore view
+SAMPLES_ROW_LIMIT = 1000
 # max rows retrieved by filter select auto complete
 FILTER_SELECT_ROW_LIMIT = 10000
 SUPERSET_WORKERS = 2  # deprecated
@@ -279,7 +281,7 @@ LANGUAGES = {
 # For example, DEFAULT_FEATURE_FLAGS = { 'FOO': True, 'BAR': False } here
 # and FEATURE_FLAGS = { 'BAR': True, 'BAZ': True } in superset_config.py
 # will result in combined feature flags of { 'FOO': True, 'BAR': True, 'BAZ': True }
-DEFAULT_FEATURE_FLAGS = {
+DEFAULT_FEATURE_FLAGS: Dict[str, bool] = {
     # Experimental feature introducing a client (browser) cache
     "CLIENT_CACHE": False,
     "ENABLE_EXPLORE_JSON_CSRF_PROTECTION": False,
